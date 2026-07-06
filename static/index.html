@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Resume Builder</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <div class="card">
+        <h1>📄 Resume Builder</h1>
+        <p class="subtitle">Generate employee resumes instantly</p>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="showTab('generate')">Generate Resume</button>
+            <button class="tab-btn" onclick="showTab('add')">Add Employee</button>
+        </div>
+
+        <div id="generate-tab" class="tab-content active">
+            <input type="text" id="employeeName" placeholder="Enter employee name" onkeypress="handleEnter(event)" />
+
+            <button onclick="generateResume()" id="generateBtn">
+                Generate Resume
+            </button>
+        </div>
+
+        <div id="add-tab" class="tab-content" style="display: none;">
+            <h3>Employee Details</h3>
+            <input type="text" id="newName" placeholder="Name" />
+            <input type="email" id="newEmail" placeholder="Email" />
+            <input type="text" id="newPhone" placeholder="Phone" />
+            <textarea id="newSummary" placeholder="Summary"></textarea>
+
+            <h3>Personal Info</h3>
+            <input type="date" id="newDob" />
+            <select id="newGender">
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+            </select>
+            <input type="text" id="newAddress" placeholder="Address" />
+
+            <h3>Education</h3>
+            <input type="text" id="newDegree" placeholder="Degree" />
+            <input type="text" id="newInstitution" placeholder="Institution" />
+            <input type="date" id="newYear" placeholder="Year of Passing" />
+
+            <h3>Skills</h3>
+            <input type="text" id="newSkills" placeholder="Skills (comma separated)" />
+
+            <h3>Projects</h3>
+            <div id="projects-container">
+                <div class="project-entry">
+                    <input type="text" placeholder="Project Name" class="proj-name" />
+                    <input type="text" placeholder="Role" class="proj-role" />
+                    <textarea placeholder="Description" class="proj-desc"></textarea>
+                </div>
+            </div>
+            <button class="secondary-btn" onclick="addProjectField()">+ Add Another Project</button>
+
+            <br><br>
+            <button onclick="saveEmployee()" id="saveBtn">Save Employee</button>
+        </div>
+
+        <div class="loader" id="loader"></div>
+        <p id="status"></p>
+    </div>
+
+    <script>
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+
+            if (tabName === 'generate') {
+                document.getElementById('generate-tab').style.display = 'block';
+                document.querySelector('.tabs button:nth-child(1)').classList.add('active');
+            } else {
+                document.getElementById('add-tab').style.display = 'block';
+                document.querySelector('.tabs button:nth-child(2)').classList.add('active');
+            }
+            document.getElementById('status').innerText = "";
+        }
+
+        function addProjectField() {
+            const container = document.getElementById('projects-container');
+            const div = document.createElement('div');
+            div.className = 'project-entry';
+            div.innerHTML = `
+            <input type="text" placeholder="Project Name" class="proj-name" />
+            <input type="text" placeholder="Role" class="proj-role" />
+            <textarea placeholder="Description" class="proj-desc"></textarea>
+        `;
+            container.appendChild(div);
+        }
+
+        function saveEmployee() {
+            const button = document.getElementById("saveBtn");
+            const status = document.getElementById("status");
+
+            // Collect Data
+            const name = document.getElementById("newName").value;
+            const email = document.getElementById("newEmail").value;
+            const phone = document.getElementById("newPhone").value;
+            const summary = document.getElementById("newSummary").value;
+
+            // Personal
+            const dob = document.getElementById("newDob").value;
+            const gender = document.getElementById("newGender").value;
+            const address = document.getElementById("newAddress").value;
+
+            // Education
+            const degree = document.getElementById("newDegree").value;
+            const institution = document.getElementById("newInstitution").value;
+            const year = document.getElementById("newYear").value;
+
+            // Skills
+            const skillsStr = document.getElementById("newSkills").value;
+            const skills = skillsStr.split(',').map(s => ({ skill_name: s.trim() })).filter(s => s.skill_name);
+
+            // Projects
+            const projectEntries = document.querySelectorAll('.project-entry');
+            const projects = Array.from(projectEntries).map(entry => ({
+                project_name: entry.querySelector('.proj-name').value,
+                role: entry.querySelector('.proj-role').value,
+                description: entry.querySelector('.proj-desc').value
+            })).filter(p => p.project_name);
+
+            if (!name || !email) {
+                status.innerText = "Name and Email are required!";
+                status.className = "error";
+                return;
+            }
+
+            const payload = {
+                name, email, phone, summary,
+                personal: { dob, gender, address },
+                education: { degree, institution, year_of_completion: parseInt(year) || 0 },
+                skills: skills,
+                projects: projects
+            };
+
+            status.innerText = "";
+            button.disabled = true;
+
+            fetch('/employee', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    status.innerText = "Employee saved successfully!";
+                    status.className = "success";
+                    // Clear or reset form could go here
+                })
+                .catch(err => {
+                    status.innerText = "Error saving employee: " + err;
+                    status.className = "error";
+                })
+                .finally(() => {
+                    button.disabled = false;
+                });
+        }
+
+        function handleEnter(event) {
+            if (event.key === "Enter") {
+                generateResume();
+            }
+        }
+
+        function generateResume() {
+            const nameInput = document.getElementById("employeeName");
+            const status = document.getElementById("status");
+            const loader = document.getElementById("loader");
+            const button = document.getElementById("generateBtn");
+
+            const name = nameInput.value.trim();
+
+            if (!name) {
+                status.innerText = "Please enter employee name";
+                status.className = "error";
+                return;
+            }
+
+            status.innerText = "";
+            loader.style.display = "block";
+            button.disabled = true;
+
+            const url = `/resume/${encodeURIComponent(name)}`;
+
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error("Employee not found");
+                    }
+                    return response.blob();
+                })
+                .then(blob => {
+                    const fileURL = window.URL.createObjectURL(blob);
+                    window.open(fileURL);
+                    status.innerText = "Resume generated successfully!";
+                    status.className = "success";
+                })
+                .catch(err => {
+                    status.innerText = err.message;
+                    status.className = "error";
+                })
+                .finally(() => {
+                    loader.style.display = "none";
+                    button.disabled = false;
+                });
+        }
+    </script>
+</body>
+
+</html>
